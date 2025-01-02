@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-//This is orderbook 
+//This is orderbook
 #[derive(Debug)]
 pub enum BidorAsk {
     Bid,
@@ -74,6 +74,23 @@ impl Limit {
             order: Vec::new(),
         }
     }
+    pub fn fill_order(&mut self, market_order: &mut Order) {
+        for limit_order in self.order.iter_mut() {
+            match market_order.size >= limit_order.size {
+                true => {
+                    market_order.size -= limit_order.size;
+                    limit_order.size = 0.0;
+                }
+                false => {
+                    limit_order.size -= market_order.size;
+                    market_order.size = 0.0;
+                }
+            }
+            if market_order.is_filled() {
+                break;
+            }
+        }
+    }
 
     pub fn add_order(&mut self, order: Order) {
         self.order.push(order);
@@ -88,5 +105,28 @@ pub struct Order {
 impl Order {
     pub fn new(bid_or_ask: BidorAsk, size: f64) -> Order {
         Order { bid_or_ask, size }
+    }
+    pub fn is_filled(&self) -> bool {
+        self.size == 0.0
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    fn limit_order_fill() {
+        let price = Price::new(10000.0);
+        let mut limit = Limit::new(price);
+        let buy_limit_order = Order::new(BidorAsk::Bid, 100.0);
+        limit.add_order(buy_limit_order);
+
+        let mut market_sell_order = Order::new(BidorAsk::Ask, 99.0);
+        limit.fill_order(&mut market_sell_order);
+        println!("{:?}", limit);
+
+        assert_eq!(market_sell_order.is_filled(), true);
+        assert_eq!(limit.order.get(0).unwrap().size, 1.0);
     }
 }
